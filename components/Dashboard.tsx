@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Canvas } from '@react-three/fiber';
 import { Shape } from './three/Shape';
 import { AddRepositoryModal } from './AddRepositoryModal';
+import { GenerateDocsModal } from './GenerateDocsModal';
 import { SettingsView } from './SettingsView';
 import { DocumentsView } from './DocumentsView';
 import { ActivityView } from './ActivityView';
@@ -97,6 +98,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, onRepoSelect }) 
   const [repos, setRepos] = useState<Repo[]>(mockRepos);
   const [filter, setFilter] = useState('');
   const [isAddRepoOpen, setIsAddRepoOpen] = useState(false);
+  const [generatingRepo, setGeneratingRepo] = useState<Repo | null>(null);
   const [currentView, setCurrentView] = useState<DashboardView>('overview');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   
@@ -246,6 +248,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, onRepoSelect }) 
         isOpen={isAddRepoOpen} 
         onClose={() => setIsAddRepoOpen(false)} 
         onImport={handleAddRepo}
+      />
+
+      <GenerateDocsModal 
+        isOpen={!!generatingRepo} 
+        repo={generatingRepo} 
+        onClose={() => setGeneratingRepo(null)} 
       />
 
       {/* Sidebar - Desktop */}
@@ -533,7 +541,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, onRepoSelect }) 
                                                         <button className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 transition-colors tooltip" title="View Docs">
                                                             <ArrowUpRight size={18} />
                                                         </button>
-                                                        <button className="flex items-center gap-2 px-4 py-2 bg-brand text-white hover:bg-brand/90 rounded-lg text-xs font-bold uppercase tracking-wide transition-all shadow-lg shadow-brand/20 hover:shadow-brand/40">
+                                                        <button 
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setGeneratingRepo(repo);
+                                                            }}
+                                                            className="flex items-center gap-2 px-4 py-2 bg-brand text-white hover:bg-brand/90 rounded-lg text-xs font-bold uppercase tracking-wide transition-all shadow-lg shadow-brand/20 hover:shadow-brand/40"
+                                                        >
                                                             <Play size={12} fill="currentColor" /> Generate
                                                         </button>
                                                     </div>
