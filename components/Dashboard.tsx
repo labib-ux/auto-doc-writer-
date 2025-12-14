@@ -32,7 +32,9 @@ import {
   ArrowDownUp,
   Plus,
   Menu,
-  X
+  X,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 
 // --- Types & Mock Data ---
@@ -101,6 +103,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, onRepoSelect }) 
   const [generatingRepo, setGeneratingRepo] = useState<Repo | null>(null);
   const [currentView, setCurrentView] = useState<DashboardView>('overview');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   
   // Advanced Filter States
   const [showFilters, setShowFilters] = useState(false);
@@ -323,6 +326,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, onRepoSelect }) 
                         />
                     </div>
                     
+                    <div className="flex bg-[#1a1a1a] border border-white/10 rounded-full p-1 hidden sm:flex">
+                        <button 
+                            onClick={() => setViewMode('grid')}
+                            className={`p-1.5 rounded-full transition-all ${viewMode === 'grid' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white'}`}
+                        >
+                            <LayoutGrid size={16} />
+                        </button>
+                        <button 
+                            onClick={() => setViewMode('list')}
+                            className={`p-1.5 rounded-full transition-all ${viewMode === 'list' ? 'bg-white/10 text-white' : 'text-gray-500 hover:text-white'}`}
+                        >
+                            <List size={16} />
+                        </button>
+                    </div>
+
                     <button 
                         onClick={() => setShowFilters(!showFilters)}
                         className={`p-2.5 border rounded-full transition-all active:scale-95 ${showFilters ? 'bg-brand text-white border-brand' : 'bg-[#1a1a1a] text-gray-400 border-white/10 hover:text-white hover:bg-white/5'}`}
@@ -460,7 +478,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, onRepoSelect }) 
                                     </AnimatePresence>
                                 </div>
 
-                                <div className="grid gap-4">
+                                <div className={`grid gap-4 ${viewMode === 'list' ? 'grid-cols-1' : 'grid-cols-1'}`}>
                                     <AnimatePresence mode="popLayout">
                                     {processedRepos.length === 0 ? (
                                         <motion.div 
@@ -480,38 +498,40 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, onRepoSelect }) 
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, scale: 0.95 }}
                                             onClick={() => onRepoSelect(repo.id)}
-                                            className={`group relative p-6 rounded-2xl border transition-all duration-300 overflow-hidden cursor-pointer ${
+                                            className={`group relative rounded-2xl border transition-all duration-300 overflow-hidden cursor-pointer ${
                                                 repo.isActive 
                                                 ? 'bg-[#1e1e1e]/80 border-brand/40 shadow-[0_0_30px_-10px_rgba(87,57,251,0.15)]' 
                                                 : 'bg-white/5 border-white/5 hover:border-white/10 hover:bg-white/10'
-                                            }`}
+                                            } ${viewMode === 'list' ? 'p-4' : 'p-6'}`}
                                         >
                                             {/* Active Glow Effect */}
                                             {repo.isActive && <div className="absolute -left-1 top-0 bottom-0 w-1 bg-brand shadow-[0_0_15px_rgba(87,57,251,0.8)]" />}
 
-                                            <div className="flex flex-col md:flex-row md:items-center gap-6 relative z-10">
+                                            <div className={`flex items-center gap-6 relative z-10 ${viewMode === 'list' ? 'justify-between' : 'flex-col md:flex-row'}`}>
                                                 
-                                                {/* 3D Visual Indicator */}
-                                                <div className="hidden md:block w-16 h-16 shrink-0 bg-white/5 rounded-xl border border-white/5 overflow-hidden relative group-hover:border-white/10 transition-colors">
-                                                <Canvas dpr={[1, 2]}>
-                                                    <ambientLight intensity={0.8} />
-                                                    <pointLight position={[5, 5, 5]} intensity={1} />
-                                                    <Shape 
-                                                    type={repo.id % 3 === 0 ? 'box' : repo.id % 3 === 1 ? 'sphere' : 'torus'} 
-                                                    color={repo.isActive ? '#5739fb' : '#404040'} 
-                                                    />
-                                                </Canvas>
-                                                </div>
+                                                {/* 3D Visual Indicator (Grid only) */}
+                                                {viewMode === 'grid' && (
+                                                    <div className="hidden md:block w-16 h-16 shrink-0 bg-white/5 rounded-xl border border-white/5 overflow-hidden relative group-hover:border-white/10 transition-colors">
+                                                    <Canvas dpr={[1, 2]}>
+                                                        <ambientLight intensity={0.8} />
+                                                        <pointLight position={[5, 5, 5]} intensity={1} />
+                                                        <Shape 
+                                                        type={repo.id % 3 === 0 ? 'box' : repo.id % 3 === 1 ? 'sphere' : 'torus'} 
+                                                        color={repo.isActive ? '#5739fb' : '#404040'} 
+                                                        />
+                                                    </Canvas>
+                                                    </div>
+                                                )}
 
-                                                <div className="flex-1">
+                                                <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-3 mb-2">
                                                         {repo.isPrivate ? <Lock size={14} className="text-amber-400/80" /> : <Globe size={14} className="text-blue-400/80" />}
-                                                        <h3 className="font-bold text-lg tracking-tight group-hover:text-brand transition-colors">{repo.name}</h3>
-                                                        <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-gray-400 font-mono flex items-center gap-1">
+                                                        <h3 className="font-bold text-lg tracking-tight group-hover:text-brand transition-colors truncate">{repo.name}</h3>
+                                                        <span className="text-[10px] px-2 py-0.5 rounded border border-white/10 bg-black/20 text-gray-400 font-mono flex items-center gap-1 shrink-0">
                                                             <GitCommit size={10} /> {repo.branch}
                                                         </span>
                                                     </div>
-                                                    <p className="text-gray-400 text-sm mb-4 max-w-lg">{repo.desc}</p>
+                                                    {viewMode === 'grid' && <p className="text-gray-400 text-sm mb-4 max-w-lg">{repo.desc}</p>}
                                                     
                                                     <div className="flex items-center gap-6 text-xs text-gray-500 font-medium">
                                                         <span className="flex items-center gap-1.5">
@@ -548,11 +568,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onLogout, onRepoSelect }) 
                                                             }}
                                                             className="flex items-center gap-2 px-4 py-2 bg-brand text-white hover:bg-brand/90 rounded-lg text-xs font-bold uppercase tracking-wide transition-all shadow-lg shadow-brand/20 hover:shadow-brand/40"
                                                         >
-                                                            <Play size={12} fill="currentColor" /> Generate
+                                                            <Play size={12} fill="currentColor" /> <span className="hidden sm:inline">Generate</span>
                                                         </button>
                                                     </div>
                                                     ) : (
-                                                    <div className="w-[100px]" /> /* Spacer */
+                                                    <div className="w-[100px] hidden sm:block" /> /* Spacer */
                                                     )}
                                                 </div>
                                             </div>

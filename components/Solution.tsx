@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { Section } from './ui/Section';
 import { Canvas } from '@react-three/fiber';
 import { Shape } from './three/Shape';
-import { FileText, BookOpen, Sigma, X, Copy, Check } from 'lucide-react';
+import { FileText, BookOpen, Sigma, X, Copy, Check, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const cards = [
@@ -101,6 +101,19 @@ export const Solution: React.FC = () => {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleDownload = () => {
+    if (activeCard === null) return;
+    const sample = samples[activeCard];
+    const element = document.createElement("a");
+    const file = new Blob([sample.text], {type: 'text/plain'});
+    element.href = URL.createObjectURL(file);
+    const ext = sample.lang === 'markdown' ? 'md' : sample.lang === 'latex' ? 'tex' : 'txt';
+    element.download = `autodoc-${sample.title.toLowerCase().replace(/\s+/g, '-')}.${ext}`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
   return (
     <Section className="bg-dark relative">
       {/* Background Text */}
@@ -192,7 +205,13 @@ export const Solution: React.FC = () => {
                     </pre>
                 </div>
 
-                <div className="p-4 border-t border-white/5 bg-white/5 flex justify-end">
+                <div className="p-4 border-t border-white/5 bg-white/5 flex justify-end gap-3">
+                    <button 
+                        onClick={handleDownload}
+                        className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition-all"
+                    >
+                        <Download className="w-4 h-4" /> Export
+                    </button>
                     <button 
                         onClick={() => handleCopy(samples[activeCard].text)}
                         className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition-all"

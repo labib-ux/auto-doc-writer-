@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { FileText, Search, Download, Trash2, Eye, Filter, FileCode, FileJson, FileType, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { FileText, Search, Download, Trash2, Eye, Filter, FileCode, FileJson, FileType, CheckCircle, Clock, AlertCircle, ArrowUp, ArrowDown } from 'lucide-react';
 
 // Mock Data
 const mockDocs = [
@@ -12,10 +12,57 @@ const mockDocs = [
   { id: 6, name: 'Authentication Flow', repo: 'backend-api-service', type: 'Markdown', size: '28 KB', date: '1 week ago', status: 'Ready' },
 ];
 
+type SortKey = 'name' | 'date' | 'status' | 'size';
+
 export const DocumentsView: React.FC = () => {
     const [filter, setFilter] = useState('');
+    const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'asc' });
 
-    const filteredDocs = mockDocs.filter(doc => 
+    const handleSort = (key: SortKey) => {
+        setSortConfig(current => ({
+            key,
+            direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+        }));
+    };
+
+    const getSortIcon = (key: SortKey) => {
+        if (sortConfig.key !== key) return null;
+        return sortConfig.direction === 'asc' ? <ArrowUp size={12} className="inline ml-1" /> : <ArrowDown size={12} className="inline ml-1" />;
+    };
+
+    // Helper for size sorting
+    const parseSize = (size: string) => {
+        if (size.endsWith('MB')) return parseFloat(size) * 1024;
+        if (size.endsWith('KB')) return parseFloat(size);
+        return 0;
+    };
+
+    // Helper for date sorting (approximate for mock strings)
+    const parseMockDate = (date: string) => {
+        if (date.includes('hour')) return 1;
+        if (date.includes('day')) return parseInt(date) * 24;
+        if (date.includes('week')) return parseInt(date) * 168;
+        return 999;
+    };
+
+    const sortedDocs = [...mockDocs].sort((a, b) => {
+        let valA: any = a[sortConfig.key];
+        let valB: any = b[sortConfig.key];
+
+        if (sortConfig.key === 'size') {
+            valA = parseSize(a.size);
+            valB = parseSize(b.size);
+        } else if (sortConfig.key === 'date') {
+            valA = parseMockDate(a.date);
+            valB = parseMockDate(b.date);
+        }
+
+        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+
+    const filteredDocs = sortedDocs.filter(doc => 
         doc.name.toLowerCase().includes(filter.toLowerCase()) || 
         doc.repo.toLowerCase().includes(filter.toLowerCase())
     );
@@ -68,12 +115,32 @@ export const DocumentsView: React.FC = () => {
             <div className="bg-[#161616] border border-white/5 rounded-2xl overflow-hidden min-h-[400px]">
                 {/* Header Row */}
                 <div className="grid grid-cols-12 gap-4 p-4 border-b border-white/5 text-xs font-mono text-gray-500 uppercase tracking-wider bg-white/[0.02]">
-                    <div className="col-span-12 sm:col-span-4">Document Name</div>
+                    <div 
+                        className="col-span-12 sm:col-span-4 cursor-pointer hover:text-white transition-colors"
+                        onClick={() => handleSort('name')}
+                    >
+                        Document Name {getSortIcon('name')}
+                    </div>
                     <div className="col-span-2 hidden md:block">Repository</div>
                     <div className="col-span-1 hidden lg:block">Type</div>
-                    <div className="col-span-1 hidden lg:block">Size</div>
-                    <div className="col-span-2 hidden sm:block">Date Generated</div>
-                    <div className="col-span-1 hidden sm:block">Status</div>
+                    <div 
+                        className="col-span-1 hidden lg:block cursor-pointer hover:text-white transition-colors"
+                        onClick={() => handleSort('size')}
+                    >
+                        Size {getSortIcon('size')}
+                    </div>
+                    <div 
+                        className="col-span-2 hidden sm:block cursor-pointer hover:text-white transition-colors"
+                        onClick={() => handleSort('date')}
+                    >
+                        Date Generated {getSortIcon('date')}
+                    </div>
+                    <div 
+                        className="col-span-1 hidden sm:block cursor-pointer hover:text-white transition-colors"
+                        onClick={() => handleSort('status')}
+                    >
+                        Status {getSortIcon('status')}
+                    </div>
                     <div className="col-span-1 hidden sm:block text-right">Actions</div>
                 </div>
 

@@ -209,6 +209,7 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({ repoId, onBa
   const [selectedFileId, setSelectedFileId] = useState<string | null>('1-1-1');
   const [viewMode, setViewMode] = useState<'split' | 'code' | 'doc'>('split');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const selectedContent = selectedFileId ? mockFileContent[selectedFileId] : null;
 
@@ -216,6 +217,18 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({ repoId, onBa
     setIsGenerating(true);
     setTimeout(() => setIsGenerating(false), 2000);
   };
+
+  // Helper to flatten tree for search
+  const flattenTree = (nodes: FileNode[], result: FileNode[] = []) => {
+      nodes.forEach(node => {
+          if (node.type === 'file') result.push(node);
+          if (node.children) flattenTree(node.children, result);
+      });
+      return result;
+  };
+
+  const allFiles = flattenTree(mockFileTree);
+  const filteredFiles = allFiles.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="flex flex-col h-screen bg-darker text-white overflow-hidden">
@@ -276,6 +289,8 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({ repoId, onBa
                <input 
                  type="text" 
                  placeholder="Search files..." 
+                 value={searchTerm}
+                 onChange={(e) => setSearchTerm(e.target.value)}
                  className="w-full bg-black/20 border border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-brand/50"
                />
              </div>
@@ -283,14 +298,36 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({ repoId, onBa
            
            <div className="flex-1 overflow-y-auto py-2">
              <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Explorer</div>
-             {mockFileTree.map(node => (
-               <FileTreeItem 
-                 key={node.id} 
-                 node={node} 
-                 selectedId={selectedFileId} 
-                 onSelect={setSelectedFileId} 
-               />
-             ))}
+             
+             {searchTerm ? (
+                 <div className="space-y-1">
+                     {filteredFiles.length > 0 ? (
+                         filteredFiles.map(file => (
+                            <div 
+                                key={file.id}
+                                onClick={() => setSelectedFileId(file.id)}
+                                className={`flex items-center gap-2 py-1.5 px-3 cursor-pointer transition-colors text-sm rounded mx-2 ${
+                                selectedFileId === file.id ? 'bg-brand/20 text-brand font-medium' : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                }`}
+                            >
+                                <FileCode size={14} className="opacity-70" />
+                                <span className="truncate">{file.name}</span>
+                            </div>
+                         ))
+                     ) : (
+                         <div className="px-4 py-4 text-sm text-gray-500 text-center">No files found.</div>
+                     )}
+                 </div>
+             ) : (
+                 mockFileTree.map(node => (
+                    <FileTreeItem 
+                        key={node.id} 
+                        node={node} 
+                        selectedId={selectedFileId} 
+                        onSelect={setSelectedFileId} 
+                    />
+                 ))
+             )}
            </div>
         </div>
 
@@ -303,7 +340,7 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({ repoId, onBa
                  {selectedFileId ? (
                    <>
                      <FileCode size={14} className="text-blue-400" />
-                     {mockFileTree[0].children![0].children!.find(f => f.id === selectedFileId)?.name || 'Button.tsx'}
+                     {allFiles.find(f => f.id === selectedFileId)?.name || 'Button.tsx'}
                    </>
                  ) : 'No file selected'}
               </div>
