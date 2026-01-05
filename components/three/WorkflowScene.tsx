@@ -14,7 +14,15 @@ const positions = [
   new THREE.Vector3(4, 0, 0),
 ];
 
-const Node = ({ position, active, label, index }: { position: THREE.Vector3; active: boolean; label: string; index: number }) => {
+// Added NodeProps interface and used React.FC to fix "Property 'key' does not exist" error
+interface NodeProps {
+  position: THREE.Vector3;
+  active: boolean;
+  label: string;
+  index: number;
+}
+
+const Node: React.FC<NodeProps> = ({ position, active, label, index }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   
   useFrame((state) => {

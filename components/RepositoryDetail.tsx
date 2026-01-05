@@ -24,8 +24,6 @@ interface RepositoryDetailProps {
   onBack: () => void;
 }
 
-// --- Mock Data ---
-
 interface FileNode {
   id: string;
   name: string;
@@ -140,18 +138,19 @@ Throws an Error if the response status is outside the 200-299 range or if the ne
   }
 };
 
-// --- Components ---
+// Added FileTreeItemProps interface and used React.FC to fix "Property 'key' does not exist" error
+interface FileTreeItemProps {
+  node: FileNode;
+  depth?: number;
+  selectedId: string | null;
+  onSelect: (id: string) => void;
+}
 
-const FileTreeItem = ({ 
+const FileTreeItem: React.FC<FileTreeItemProps> = ({ 
   node, 
   depth = 0, 
   selectedId, 
   onSelect 
-}: { 
-  node: FileNode; 
-  depth?: number; 
-  selectedId: string | null; 
-  onSelect: (id: string) => void;
 }) => {
   const [isOpen, setIsOpen] = useState(true);
   const isSelected = selectedId === node.id;
@@ -164,40 +163,25 @@ const FileTreeItem = ({
           if (node.type === 'folder') setIsOpen(!isOpen);
           else onSelect(node.id);
         }}
-        className={`flex items-center gap-1.5 py-1 px-2 cursor-pointer transition-colors text-sm rounded mx-2 ${
-          isSelected ? 'bg-brand/20 text-brand font-medium' : 'text-gray-400 hover:text-white hover:bg-white/5'
+        className={`flex items-center gap-2 py-2 px-4 cursor-pointer transition-all text-sm rounded mx-2 ${
+          isSelected ? 'bg-brand text-white font-black' : 'text-zinc-400 hover:text-white hover:bg-zinc-900'
         }`}
-        style={{ paddingLeft: `${depth * 12 + 8}px` }}
+        style={{ paddingLeft: `${depth * 14 + 16}px` }}
       >
         {node.type === 'folder' && (
           <span className="opacity-70">
             {isOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </span>
         )}
-        
-        <span className={isSelected ? 'text-brand' : 'text-gray-500'}>
-          {node.type === 'folder' ? (
-             isOpen ? <FolderOpen size={16} /> : <Folder size={16} />
-          ) : (
-             node.language === 'json' ? <FileJson size={16} /> : 
-             node.language === 'markdown' ? <FileText size={16} /> :
-             <FileCode size={16} />
-          )}
+        <span className={isSelected ? 'text-white' : 'text-zinc-600'}>
+          {node.type === 'folder' ? (isOpen ? <FolderOpen size={16} /> : <Folder size={16} />) : <FileCode size={16} />}
         </span>
-        
-        <span className="truncate">{node.name}</span>
+        <span className="truncate font-medium">{node.name}</span>
       </div>
-
       {hasChildren && isOpen && (
-        <div>
+        <div className="mt-0.5">
           {node.children!.map(child => (
-            <FileTreeItem 
-              key={child.id} 
-              node={child} 
-              depth={depth + 1} 
-              selectedId={selectedId} 
-              onSelect={onSelect}
-            />
+            <FileTreeItem key={child.id} node={child} depth={depth + 1} selectedId={selectedId} onSelect={onSelect} />
           ))}
         </div>
       )}
@@ -213,12 +197,6 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({ repoId, onBa
 
   const selectedContent = selectedFileId ? mockFileContent[selectedFileId] : null;
 
-  const handleGenerate = () => {
-    setIsGenerating(true);
-    setTimeout(() => setIsGenerating(false), 2000);
-  };
-
-  // Helper to flatten tree for search
   const flattenTree = (nodes: FileNode[], result: FileNode[] = []) => {
       nodes.forEach(node => {
           if (node.type === 'file') result.push(node);
@@ -228,191 +206,74 @@ export const RepositoryDetail: React.FC<RepositoryDetailProps> = ({ repoId, onBa
   };
 
   const allFiles = flattenTree(mockFileTree);
-  const filteredFiles = allFiles.filter(f => f.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
-    <div className="flex flex-col h-screen bg-darker text-white overflow-hidden">
-      
-      {/* Header */}
-      <header className="h-16 flex items-center justify-between px-6 border-b border-white/5 bg-[#121212] z-20">
-        <div className="flex items-center gap-4">
-          <button 
-            onClick={onBack}
-            className="p-2 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          
+    <div className="flex flex-col h-screen bg-black text-white overflow-hidden">
+      <header className="h-16 flex items-center justify-between px-8 border-b border-zinc-800 bg-zinc-950 z-20">
+        <div className="flex items-center gap-6">
+          <button onClick={onBack} className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white transition-colors"><ArrowLeft size={22} /></button>
           <div className="flex flex-col">
-             <h1 className="text-lg font-bold flex items-center gap-2">
-               autodoc-writer-core <span className="text-gray-600">/</span> src
-             </h1>
-             <div className="flex items-center gap-2 text-xs text-gray-500 font-mono">
-               <GitBranch size={12} />
-               <span>main</span>
-               <span className="w-1 h-1 rounded-full bg-gray-600" />
-               <span>Last update 2m ago</span>
+             <h1 className="text-lg font-black tracking-tight text-white flex items-center gap-2">autodoc-writer-core <span className="text-zinc-700">/</span> src</h1>
+             <div className="flex items-center gap-2 text-[10px] text-zinc-500 font-black uppercase tracking-widest">
+               <GitBranch size={12} /> main <span className="w-1 h-1 rounded-full bg-zinc-700" /> Last sync 2m ago
              </div>
           </div>
         </div>
-
-        <div className="flex items-center gap-3">
-          <button className="flex items-center gap-2 px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-sm text-gray-300 hover:bg-white/10 transition-colors">
-            <Download size={16} /> Export
-          </button>
-          <button 
-            onClick={handleGenerate}
-            disabled={isGenerating}
-            className="flex items-center gap-2 px-4 py-1.5 bg-brand text-white rounded-lg text-sm font-semibold hover:bg-brand/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isGenerating ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Generating...
-                </>
-            ) : (
-                <>
-                  <Play size={16} fill="currentColor" /> Generate Docs
-                </>
-            )}
-          </button>
+        <div className="flex items-center gap-4">
+          <button className="flex items-center gap-2 px-4 py-2 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-black text-zinc-300 hover:bg-zinc-800 transition-all uppercase tracking-widest"><Download size={16} /> Export</button>
+          <button onClick={() => { setIsGenerating(true); setTimeout(() => setIsGenerating(false), 2000); }} disabled={isGenerating} className="flex items-center gap-2 px-5 py-2 bg-brand text-white rounded-xl text-xs font-black uppercase tracking-widest hover:scale-105 transition-all disabled:opacity-50"><Play size={16} fill="currentColor" /> {isGenerating ? 'Analyzing...' : 'Generate'}</button>
         </div>
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        
-        {/* Sidebar: File Explorer */}
-        <div className="w-72 bg-[#161616] border-r border-white/5 flex flex-col hidden md:flex">
-           <div className="p-4 border-b border-white/5">
+        <div className="w-80 bg-zinc-950 border-r border-zinc-800 flex flex-col hidden md:flex">
+           <div className="p-5 border-b border-zinc-800">
              <div className="relative">
-               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4" />
-               <input 
-                 type="text" 
-                 placeholder="Search files..." 
-                 value={searchTerm}
-                 onChange={(e) => setSearchTerm(e.target.value)}
-                 className="w-full bg-black/20 border border-white/10 rounded-lg pl-9 pr-3 py-1.5 text-sm text-gray-300 focus:outline-none focus:border-brand/50"
-               />
+               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-600 w-4 h-4" />
+               <input type="text" placeholder="Jump to file..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-11 pr-4 py-2.5 text-sm text-white font-medium focus:outline-none focus:border-brand transition-all" />
              </div>
            </div>
-           
-           <div className="flex-1 overflow-y-auto py-2">
-             <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Explorer</div>
-             
-             {searchTerm ? (
-                 <div className="space-y-1">
-                     {filteredFiles.length > 0 ? (
-                         filteredFiles.map(file => (
-                            <div 
-                                key={file.id}
-                                onClick={() => setSelectedFileId(file.id)}
-                                className={`flex items-center gap-2 py-1.5 px-3 cursor-pointer transition-colors text-sm rounded mx-2 ${
-                                selectedFileId === file.id ? 'bg-brand/20 text-brand font-medium' : 'text-gray-400 hover:text-white hover:bg-white/5'
-                                }`}
-                            >
-                                <FileCode size={14} className="opacity-70" />
-                                <span className="truncate">{file.name}</span>
-                            </div>
-                         ))
-                     ) : (
-                         <div className="px-4 py-4 text-sm text-gray-500 text-center">No files found.</div>
-                     )}
-                 </div>
-             ) : (
-                 mockFileTree.map(node => (
-                    <FileTreeItem 
-                        key={node.id} 
-                        node={node} 
-                        selectedId={selectedFileId} 
-                        onSelect={setSelectedFileId} 
-                    />
-                 ))
-             )}
+           <div className="flex-1 overflow-y-auto py-4">
+             <div className="px-6 py-2 text-[10px] font-black text-zinc-600 uppercase tracking-[0.25em] mb-2">Workspace Explorer</div>
+             {mockFileTree.map(node => <FileTreeItem key={node.id} node={node} selectedId={selectedFileId} onSelect={setSelectedFileId} />)}
            </div>
         </div>
 
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col bg-[#0d0d0d] relative">
-           
-           {/* View Toggle Bar */}
-           <div className="h-10 bg-[#161616] border-b border-white/5 flex items-center justify-between px-4">
-              <div className="text-sm text-gray-400 font-mono flex items-center gap-2">
-                 {selectedFileId ? (
-                   <>
-                     <FileCode size={14} className="text-blue-400" />
-                     {allFiles.find(f => f.id === selectedFileId)?.name || 'Button.tsx'}
-                   </>
-                 ) : 'No file selected'}
+        <div className="flex-1 flex flex-col bg-black relative">
+           <div className="h-11 bg-zinc-950 border-b border-zinc-800 flex items-center justify-between px-6">
+              <div className="text-xs text-zinc-300 font-bold tracking-tight flex items-center gap-2">
+                 {selectedFileId ? (<><FileCode size={16} className="text-brand" /> {allFiles.find(f => f.id === selectedFileId)?.name}</>) : 'No file selected'}
               </div>
-
-              <div className="flex bg-black/30 rounded p-0.5">
-                  <button 
-                    onClick={() => setViewMode('code')}
-                    className={`p-1 rounded text-gray-400 hover:text-white transition-colors ${viewMode === 'code' ? 'bg-white/10 text-white' : ''}`}
-                    title="Code Only"
-                  >
-                    <Code2 size={14} />
-                  </button>
-                  <button 
-                    onClick={() => setViewMode('split')}
-                    className={`p-1 rounded text-gray-400 hover:text-white transition-colors ${viewMode === 'split' ? 'bg-white/10 text-white' : ''}`}
-                    title="Split View"
-                  >
-                    <Columns size={14} />
-                  </button>
-                  <button 
-                    onClick={() => setViewMode('doc')}
-                    className={`p-1 rounded text-gray-400 hover:text-white transition-colors ${viewMode === 'doc' ? 'bg-white/10 text-white' : ''}`}
-                    title="Docs Only"
-                  >
-                    <FileText size={14} />
-                  </button>
+              <div className="flex bg-zinc-900 rounded-lg p-1 border border-zinc-800">
+                  <button onClick={() => setViewMode('code')} className={`px-2.5 py-1 rounded-md transition-all ${viewMode === 'code' ? 'bg-zinc-800 text-white shadow-lg' : 'text-zinc-500 hover:text-white'}`}><Code2 size={16} /></button>
+                  <button onClick={() => setViewMode('split')} className={`px-2.5 py-1 rounded-md transition-all ${viewMode === 'split' ? 'bg-zinc-800 text-white shadow-lg' : 'text-zinc-500 hover:text-white'}`}><Columns size={16} /></button>
+                  <button onClick={() => setViewMode('doc')} className={`px-2.5 py-1 rounded-md transition-all ${viewMode === 'doc' ? 'bg-zinc-800 text-white shadow-lg' : 'text-zinc-500 hover:text-white'}`}><FileText size={16} /></button>
               </div>
            </div>
 
-           {/* Content Canvas */}
-           <div className="flex-1 overflow-hidden relative flex">
+           <div className="flex-1 overflow-hidden flex">
               {!selectedContent ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
-                      <LayoutTemplate size={48} className="mb-4 opacity-20" />
-                      <p>Select a file to view content</p>
+                  <div className="flex-1 flex flex-col items-center justify-center text-zinc-700">
+                      <LayoutTemplate size={64} className="mb-6 opacity-10" />
+                      <p className="font-black text-xs uppercase tracking-[0.3em]">Pick a file to analyze</p>
                   </div>
               ) : (
                   <>
-                      {/* Code Pane */}
                       {(viewMode === 'split' || viewMode === 'code') && (
-                          <div className={`flex-1 overflow-auto bg-[#0d0d0d] border-r border-white/5 relative ${viewMode === 'code' ? 'w-full' : 'w-1/2'}`}>
-                              <div className="absolute top-0 left-0 px-4 py-2 bg-[#1a1a1a]/80 backdrop-blur border-b border-white/5 w-full sticky z-10">
-                                  <span className="text-xs font-bold text-gray-500 uppercase">Source Code</span>
-                              </div>
-                              <div className="p-6">
-                                  <pre className="font-mono text-sm text-gray-300 leading-relaxed">
-                                      {selectedContent.code}
-                                  </pre>
+                          <div className={`flex-1 overflow-auto bg-black border-r border-zinc-800 ${viewMode === 'code' ? 'w-full' : 'w-1/2'}`}>
+                              <div className="p-10">
+                                  <pre className="font-mono text-sm text-zinc-100 leading-relaxed font-medium">{selectedContent.code}</pre>
                               </div>
                           </div>
                       )}
-
-                      {/* Doc Pane */}
                       {(viewMode === 'split' || viewMode === 'doc') && (
-                          <div className={`flex-1 overflow-auto bg-[#121212] relative ${viewMode === 'doc' ? 'w-full' : 'w-1/2'}`}>
-                              <div className="absolute top-0 left-0 px-4 py-2 bg-[#1a1a1a]/80 backdrop-blur border-b border-white/5 w-full sticky z-10 flex justify-between items-center">
-                                  <span className="text-xs font-bold text-brand uppercase">Generated Documentation</span>
-                                  {isGenerating ? (
-                                      <span className="text-xs text-brand animate-pulse">Updating...</span>
-                                  ) : (
-                                      <span className="text-[10px] text-green-400 flex items-center gap-1">
-                                          <CheckCircle size={10} /> Up to date
-                                      </span>
-                                  )}
-                              </div>
-                              <div className="p-8 prose prose-invert prose-sm max-w-none">
+                          <div className={`flex-1 overflow-auto bg-[#0a0a0a] ${viewMode === 'doc' ? 'w-full' : 'w-1/2'}`}>
+                              <div className="p-12 prose prose-invert prose-sm max-w-none">
                                   {selectedContent.doc.split('\n').map((line, i) => {
-                                      if (line.startsWith('# ')) return <h1 key={i} className="text-2xl font-bold mb-4 text-white pb-2 border-b border-white/10">{line.replace('# ', '')}</h1>
-                                      if (line.startsWith('## ')) return <h2 key={i} className="text-xl font-semibold mt-6 mb-3 text-white">{line.replace('## ', '')}</h2>
-                                      if (line.startsWith('```')) return null; // Simple skip for code block markers
-                                      if (line.startsWith('|')) return <div key={i} className="font-mono text-xs bg-white/5 p-1 my-1 truncate text-gray-400">{line}</div>
-                                      return <p key={i} className="mb-2 text-gray-300 leading-relaxed">{line}</p>
+                                      if (line.startsWith('# ')) return <h1 key={i} className="text-4xl font-black mb-8 text-white border-b-2 border-zinc-800 pb-6 tracking-tight">{line.replace('# ', '')}</h1>
+                                      if (line.startsWith('## ')) return <h2 key={i} className="text-2xl font-extrabold mt-12 mb-6 text-white tracking-tight">{line.replace('## ', '')}</h2>
+                                      if (line.startsWith('|')) return <div key={i} className="font-mono text-xs bg-zinc-900 border-2 border-zinc-800 p-4 my-4 text-zinc-200 rounded-2xl shadow-inner">{line}</div>
+                                      return <p key={i} className="mb-6 text-zinc-200 leading-relaxed font-bold text-base">{line}</p>
                                   })}
                               </div>
                           </div>

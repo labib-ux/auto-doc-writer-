@@ -24,7 +24,14 @@ const Toggle = ({ label, checked, onChange }: { label: string, checked: boolean,
   </div>
 );
 
-const Section = ({ title, icon, children }: { title: string, icon: React.ReactNode, children: React.ReactNode }) => (
+// Added SectionProps interface and used React.FC to fix "Property 'children' is missing" error
+interface SectionProps {
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}
+
+const Section: React.FC<SectionProps> = ({ title, icon, children }) => (
   <motion.div 
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
