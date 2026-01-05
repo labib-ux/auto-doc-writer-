@@ -1,6 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, FileText, FileCode, FileType, Check, Download, Play, BookOpen } from 'lucide-react';
+import { X, FileText, FileCode, FileType, Check, Download, Play, BookOpen, Loader2 } from 'lucide-react';
+import { generateDocumentation } from '../lib/gemini';
 
 interface Repo {
   id: number;
@@ -18,6 +20,7 @@ export const GenerateDocsModal: React.FC<GenerateDocsModalProps> = ({ repo, isOp
   const [selectedFormats, setSelectedFormats] = useState<string[]>(['markdown']);
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
+  const [results, setResults] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (isOpen && repo) {
@@ -25,214 +28,154 @@ export const GenerateDocsModal: React.FC<GenerateDocsModalProps> = ({ repo, isOp
         setSelectedFormats(['markdown']);
         setProgress(0);
         setLogs([]);
+        setResults({});
     }
   }, [isOpen, repo]);
 
   const toggleFormat = (format: string) => {
-    if (selectedFormats.includes(format)) {
-      setSelectedFormats(selectedFormats.filter(f => f !== format));
-    } else {
-      setSelectedFormats([...selectedFormats, format]);
-    }
+    setSelectedFormats(prev => 
+      prev.includes(format) ? prev.filter(f => f !== format) : [...prev, format]
+    );
   };
 
-  const addLog = (msg: string) => setLogs(prev => [...prev, msg]);
-
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (selectedFormats.length === 0) return;
     
     setStep('generating');
-    setProgress(0);
-    setLogs(['Initializing AI engine...']);
+    setProgress(10);
+    setLogs(['Contacting Gemini Pro Engine...', 'Connecting to repository: ' + repo?.name]);
 
-    // Simulation sequence
-    const sequence = [
-        { progress: 20, msg: 'Scanning repository structure...' },
-        { progress: 45, msg: 'Analyzing code semantics...' },
-        { progress: 60, msg: 'Identifying dependencies...' },
-        { progress: 80, msg: 'Generating documentation content...' },
-        { progress: 95, msg: 'Formatting output files...' },
-        { progress: 100, msg: 'Finalizing...' }
-    ];
+    // In a real scenario, we'd fetch the actual code from the backend here.
+    // For this demonstration, we use a sample code block to analyze.
+    const dummyCode = `
+    async function processOrder(order) {
+        const validated = await validate(order);
+        if (!validated) throw new Error("Invalid");
+        const receipt = await db.save(validated);
+        return receipt.id;
+    }`;
 
-    let currentIdx = 0;
-
-    const interval = setInterval(() => {
-        if (currentIdx >= sequence.length) {
-            clearInterval(interval);
-            setTimeout(() => setStep('complete'), 600);
-            return;
-        }
+    try {
+        const newResults: Record<string, string> = {};
         
-        const stepData = sequence[currentIdx];
-        setProgress(stepData.progress);
-        addLog(stepData.msg);
-        currentIdx++;
+        for (let i = 0; i < selectedFormats.length; i++) {
+            const fmt = selectedFormats[i];
+            const mappedFmt = fmt === 'markdown' ? 'simple' : fmt === 'latex' ? 'latex' : 'research';
+            
+            setLogs(prev => [...prev, `Analyzing for ${fmt} format...`]);
+            setProgress(prev => prev + (80 / selectedFormats.length));
+            
+            const output = await generateDocumentation(dummyCode, mappedFmt as any);
+            newResults[fmt] = output;
+        }
 
-    }, 800);
+        setResults(newResults);
+        setProgress(100);
+        setLogs(prev => [...prev, 'Finalizing documents...', 'Complete!']);
+        setTimeout(() => setStep('complete'), 500);
+    } catch (err) {
+        setLogs(prev => [...prev, 'Error: ' + (err as Error).message]);
+        setStep('config');
+    }
   };
 
   const formats = [
-    { id: 'markdown', label: 'Markdown', icon: <FileCode size={20} />, desc: 'Standard .md files for GitHub wikis.' },
-    { id: 'pdf', label: 'PDF Report', icon: <FileText size={20} />, desc: 'Professional paginated document.' },
-    { id: 'html', label: 'HTML Site', icon: <FileType size={20} />, desc: 'Static website with navigation.' },
-    { id: 'latex', label: 'LaTeX', icon: <BookOpen size={20} />, desc: 'Academic paper format.' },
+    { id: 'markdown', label: 'Markdown', icon: <FileCode size={20} />, desc: 'Standard .md files.' },
+    { id: 'pdf', label: 'PDF Report', icon: <FileText size={20} />, desc: 'Formal report layout.' },
+    { id: 'latex', label: 'LaTeX', icon: <BookOpen size={20} />, desc: 'Academic styling.' },
   ];
 
   return (
     <AnimatePresence>
       {isOpen && repo && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-          />
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
 
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="relative w-full max-w-2xl bg-[#161616] border border-white/10 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]"
-          >
-            {/* Header */}
-            <div className="p-6 border-b border-white/5 flex items-center justify-between bg-[#1a1a1a]">
+          <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-2xl bg-zinc-950 border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-8 border-b border-zinc-900 flex items-center justify-between bg-zinc-900/20">
               <div>
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  Generate Documentation
-                </h2>
-                <p className="text-sm text-gray-400 mt-1">Target: <span className="text-white font-mono">{repo.name}</span></p>
+                <h2 className="text-2xl font-black text-white">Generate Documentation</h2>
+                <p className="text-sm text-zinc-500 font-bold mt-1 uppercase tracking-widest">Target: {repo.name}</p>
               </div>
-              <button onClick={onClose} className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-400 hover:text-white transition-colors">
-                <X size={20} />
-              </button>
+              <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-full transition-colors"><X size={24} /></button>
             </div>
 
-            {/* Content */}
-            <div className="p-6 flex-1 overflow-y-auto">
+            <div className="p-8 flex-1 overflow-y-auto">
                 {step === 'config' && (
-                    <div className="space-y-6">
-                        <div>
-                            <h3 className="text-sm font-bold uppercase text-gray-500 mb-3 tracking-wider">Select Formats</h3>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                {formats.map(f => (
-                                    <div 
-                                        key={f.id}
-                                        onClick={() => toggleFormat(f.id)}
-                                        className={`p-4 rounded-xl border cursor-pointer transition-all flex items-start gap-3 ${selectedFormats.includes(f.id) ? 'bg-brand/10 border-brand/50' : 'bg-white/5 border-white/5 hover:bg-white/10'}`}
-                                    >
-                                        <div className={selectedFormats.includes(f.id) ? 'text-brand' : 'text-gray-400'}>{f.icon}</div>
-                                        <div>
-                                            <div className="font-semibold text-sm flex items-center gap-2">
-                                                {f.label} 
-                                                {selectedFormats.includes(f.id) && <Check size={14} className="text-brand" />}
-                                            </div>
-                                            <p className="text-xs text-gray-500 mt-1">{f.desc}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                    <div className="space-y-8">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {formats.map(f => (
+                                <button key={f.id} onClick={() => toggleFormat(f.id)} className={`p-6 rounded-2xl border-2 text-left transition-all ${selectedFormats.includes(f.id) ? 'bg-brand border-brand' : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'}`}>
+                                    <div className="mb-4">{f.icon}</div>
+                                    <div className="font-black text-sm uppercase tracking-widest mb-1">{f.label}</div>
+                                    <p className="text-xs opacity-60 font-medium">{f.desc}</p>
+                                </button>
+                            ))}
                         </div>
-
-                        <div>
-                            <h3 className="text-sm font-bold uppercase text-gray-500 mb-3 tracking-wider">Configuration</h3>
-                             <div className="bg-white/5 rounded-xl border border-white/5 p-4 space-y-3">
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm text-gray-300">Include Code Snippets</span>
-                                    <div className="w-10 h-5 bg-brand rounded-full relative"><div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full"></div></div>
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm text-gray-300">Generate Diagrams (Mermaid)</span>
-                                    <div className="w-10 h-5 bg-white/10 rounded-full relative"><div className="absolute left-1 top-1 w-3 h-3 bg-white rounded-full"></div></div>
-                                </div>
-                             </div>
+                        <div className="p-6 bg-zinc-900 rounded-2xl border border-zinc-800 space-y-4">
+                            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-zinc-500">AI Model</h3>
+                            <div className="flex items-center gap-3 text-sm font-bold text-white bg-black/40 p-3 rounded-xl border border-white/5">
+                                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" /> Gemini 3 Pro (Coding Optimized)
+                            </div>
                         </div>
                     </div>
                 )}
 
                 {step === 'generating' && (
-                    <div className="flex flex-col items-center justify-center py-8 space-y-6">
-                        <div className="relative w-24 h-24">
+                    <div className="flex flex-col items-center justify-center py-12 space-y-8">
+                        <div className="relative w-32 h-32">
                             <svg className="w-full h-full transform -rotate-90">
-                                <circle cx="48" cy="48" r="45" stroke="currentColor" strokeWidth="6" fill="transparent" className="text-white/5" />
-                                <circle cx="48" cy="48" r="45" stroke="currentColor" strokeWidth="6" fill="transparent" strokeDasharray={283} strokeDashoffset={283 - (283 * progress / 100)} className="text-brand transition-all duration-300 ease-out" />
+                                <circle cx="64" cy="64" r="60" stroke="currentColor" strokeWidth="8" fill="transparent" className="text-zinc-900" />
+                                <circle cx="64" cy="64" r="60" stroke="currentColor" strokeWidth="8" fill="transparent" strokeDasharray={377} strokeDashoffset={377 - (377 * progress / 100)} className="text-brand transition-all duration-500 ease-out" />
                             </svg>
-                            <div className="absolute inset-0 flex items-center justify-center text-xl font-bold font-mono">
-                                {Math.round(progress)}%
-                            </div>
+                            <div className="absolute inset-0 flex items-center justify-center text-2xl font-black">{Math.round(progress)}%</div>
                         </div>
-                        <div className="w-full max-w-md bg-black/30 rounded-lg p-4 font-mono text-xs h-32 overflow-y-auto border border-white/10">
+                        <div className="w-full bg-black border border-zinc-800 rounded-2xl p-6 font-mono text-xs h-48 overflow-y-auto shadow-inner">
                              {logs.map((log, i) => (
-                                 <div key={i} className="text-gray-400 mb-1">> {log}</div>
+                                 <div key={i} className="text-zinc-400 mb-2 flex gap-2"><span className="text-brand font-black">→</span> {log}</div>
                              ))}
-                             <div className="animate-pulse text-brand">>_</div>
+                             <div className="animate-pulse text-brand font-black">_</div>
                         </div>
                     </div>
                 )}
 
                 {step === 'complete' && (
-                    <div className="space-y-6">
-                        <div className="flex items-center gap-4 bg-green-500/10 border border-green-500/20 p-4 rounded-xl">
-                            <div className="p-2 bg-green-500 rounded-full text-white">
-                                <Check size={20} />
-                            </div>
+                    <div className="space-y-8">
+                        <div className="bg-green-500/10 border-2 border-green-500/20 p-6 rounded-2xl flex items-center gap-6">
+                            <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center shadow-lg shadow-green-500/20"><Check className="text-white" size={24} /></div>
                             <div>
-                                <h3 className="font-bold text-green-400">Generation Complete</h3>
-                                <p className="text-sm text-green-400/70">Documentation successfully created in {selectedFormats.length} formats.</p>
+                                <h3 className="text-xl font-black text-white">Analysis Finished</h3>
+                                <p className="text-zinc-400 font-medium">Your docs are ready for download or export.</p>
                             </div>
                         </div>
-
-                        <div>
-                             <h3 className="text-sm font-bold uppercase text-gray-500 mb-3 tracking-wider">Generated Files</h3>
-                             <div className="space-y-2">
-                                {selectedFormats.map(fmt => (
-                                    <div key={fmt} className="flex items-center justify-between p-4 bg-white/5 border border-white/5 rounded-xl hover:bg-white/10 transition-colors">
+                        <div className="space-y-4">
+                            {Object.entries(results).map(([fmt, text]) => (
+                                <div key={fmt} className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl">
+                                    <div className="flex items-center justify-between mb-4">
                                         <div className="flex items-center gap-3">
-                                            {fmt === 'markdown' && <FileCode className="text-blue-400" />}
-                                            {fmt === 'pdf' && <FileText className="text-red-400" />}
-                                            {fmt === 'html' && <FileType className="text-orange-400" />}
-                                            {fmt === 'latex' && <BookOpen className="text-emerald-400" />}
-                                            <div>
-                                                <div className="font-medium text-white capitalize">{repo.name}_{fmt === 'latex' ? 'paper' : 'docs'}.{fmt === 'markdown' ? 'md' : fmt === 'latex' ? 'tex' : fmt}</div>
-                                                <div className="text-xs text-gray-500">2.4 MB • Generated just now</div>
-                                            </div>
+                                            <FileText className="text-brand" />
+                                            <span className="font-black uppercase text-xs tracking-widest">{fmt} Output</span>
                                         </div>
-                                        <div className="flex gap-2">
-                                            <button className="px-3 py-1.5 text-xs font-medium bg-white/10 hover:bg-white/20 rounded-lg transition-colors">Preview</button>
-                                            <button className="px-3 py-1.5 text-xs font-medium bg-brand hover:bg-brand/90 text-white rounded-lg transition-colors flex items-center gap-1">
-                                                <Download size={14} /> Download
-                                            </button>
-                                        </div>
+                                        <button className="text-xs font-black uppercase text-brand hover:underline">Preview</button>
                                     </div>
-                                ))}
-                             </div>
+                                    <pre className="text-[10px] text-zinc-500 line-clamp-3 bg-black/40 p-4 rounded-xl font-mono">{text}</pre>
+                                </div>
+                            ))}
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* Footer */}
-            {step === 'config' && (
-                <div className="p-4 border-t border-white/5 bg-[#1a1a1a] flex justify-end gap-3">
-                    <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5 transition-colors">Cancel</button>
-                    <button 
-                        onClick={handleGenerate}
-                        disabled={selectedFormats.length === 0}
-                        className="px-6 py-2 rounded-lg text-sm font-bold bg-brand text-white hover:bg-brand/90 shadow-lg shadow-brand/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                    >
-                        <Play size={16} fill="currentColor" /> Start Generation
-                    </button>
-                </div>
-            )}
-            {step === 'complete' && (
-                <div className="p-4 border-t border-white/5 bg-[#1a1a1a] flex justify-end gap-3">
-                     <button onClick={onClose} className="px-6 py-2 rounded-lg text-sm font-bold bg-white/10 text-white hover:bg-white/20 transition-colors">
-                        Close
-                    </button>
-                </div>
-            )}
+            <div className="p-8 border-t border-zinc-900 bg-zinc-900/20 flex justify-end gap-4">
+                {step === 'config' ? (
+                    <>
+                        <button onClick={onClose} className="px-6 py-3 text-sm font-black uppercase tracking-widest text-zinc-500 hover:text-white transition-colors">Cancel</button>
+                        <button onClick={handleGenerate} className="px-8 py-3 bg-brand text-white rounded-xl font-black uppercase tracking-widest text-sm shadow-xl shadow-brand/20 hover:scale-105 transition-all">Start Engine</button>
+                    </>
+                ) : step === 'complete' ? (
+                    <button onClick={onClose} className="px-10 py-3 bg-white text-black rounded-xl font-black uppercase tracking-widest text-sm hover:bg-zinc-200 transition-all">Done</button>
+                ) : null}
+            </div>
           </motion.div>
         </div>
       )}

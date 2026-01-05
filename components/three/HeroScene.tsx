@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Float, Text, useCursor, RoundedBox } from '@react-three/drei';
@@ -18,13 +19,12 @@ const CodeBlock = ({ viewMode }: { viewMode: DocType }) => {
       // Smooth rotation towards mouse
       const x = (state.mouse.x * Math.PI) / 6;
       const y = (state.mouse.y * Math.PI) / 6;
-      meshRef.current.rotation.x = THREE.MathUtils.lerp(meshRef.current.rotation.x, -y, 0.1);
-      meshRef.current.rotation.y = THREE.MathUtils.lerp(meshRef.current.rotation.y, x, 0.1);
-
-      // Flip animation based on viewMode
+      
+      // Fix: Calculate target rotation and lerp towards it to avoid additive rotation issues
       const targetRotationY = viewMode === DocType.DOC ? Math.PI : 0;
-      // We add the mouse rotation to the base flip state
-      meshRef.current.rotation.y += targetRotationY;
+      
+      meshRef.current.rotation.x = THREE.MathUtils.lerp(meshRef.current.rotation.x, -y, 0.1);
+      meshRef.current.rotation.y = THREE.MathUtils.lerp(meshRef.current.rotation.y, x + targetRotationY, 0.1);
     }
   });
 
