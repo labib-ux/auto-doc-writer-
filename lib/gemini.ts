@@ -2,7 +2,6 @@
 import { GoogleGenAI } from "@google/genai";
 
 // Initialization using the environment variable as per guidelines
-// Fix: Use process.env.API_KEY directly for initialization to strictly follow guidelines
 const getAI = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const generateDocumentation = async (code: string, format: 'simple' | 'research' | 'latex') => {
@@ -19,10 +18,12 @@ export const generateDocumentation = async (code: string, format: 'simple' | 're
       model: 'gemini-3-pro-preview',
       contents: prompts[format],
       config: {
-        temperature: 0.7,
+        temperature: 1.0,
         topP: 0.95,
-        topK: 40,
-        thinkingConfig: { thinkingBudget: 0 } // Standard generation
+        topK: 64,
+        // Fix: gemini-3-pro-preview requires a non-zero thinking budget.
+        // We set it to 16,384 tokens to allow for deep architectural reasoning.
+        thinkingConfig: { thinkingBudget: 16384 }
       },
     });
 
@@ -35,9 +36,18 @@ export const generateDocumentation = async (code: string, format: 'simple' | 're
 
 export const explainCodeSnippet = async (snippet: string) => {
     const ai = getAI();
-    const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Briefly explain what this specific line or block of code does in 1 sentence: \n\n${snippet}`,
-    });
-    return response.text;
+    try {
+        const response = await ai.models.generateContent({
+            model: 'gemini-3-flash-preview',
+            contents: `Briefly explain what this specific line or block of code does in 1 sentence: \n\n${snippet}`,
+            config: {
+                // Enabling a smaller thinking budget for flash to ensure high-quality explanations
+                thinkingConfig: { thinkingBudget: 4096 }
+            }
+        });
+        return response.text;
+    } catch (error) {
+        console.error("Gemini API Error (Explain):", error);
+        return "Failed to analyze snippet.";
+    }
 };

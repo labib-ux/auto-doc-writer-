@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
 import { Problem } from './components/Problem';
@@ -10,12 +11,22 @@ import { Footer } from './components/Footer';
 import { Login } from './components/Login';
 import { Dashboard } from './components/Dashboard';
 import { RepositoryDetail } from './components/RepositoryDetail';
+import { api } from './lib/api';
 
 type Page = 'home' | 'login' | 'dashboard' | 'repo-detail';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [currentRepoId, setCurrentRepoId] = useState<number | null>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
+
+  useEffect(() => {
+    const session = api.getSession();
+    if (session) {
+      setCurrentPage('dashboard');
+    }
+    setIsInitializing(false);
+  }, []);
 
   const handleRepoSelect = (id: number) => {
     setCurrentRepoId(id);
@@ -23,6 +34,18 @@ function App() {
   };
 
   const navigateToLogin = () => setCurrentPage('login');
+  
+  const handleLogin = () => {
+    api.setSession({ name: 'John Doe', email: 'john@example.com' });
+    setCurrentPage('dashboard');
+  };
+
+  const handleLogout = () => {
+    api.clearSession();
+    setCurrentPage('home');
+  };
+
+  if (isInitializing) return <div className="bg-black min-h-screen flex items-center justify-center text-brand font-black animate-pulse">AUTODOC LOADING...</div>;
 
   if (currentPage === 'repo-detail' && currentRepoId) {
     return (
@@ -36,7 +59,7 @@ function App() {
   if (currentPage === 'dashboard') {
     return (
       <Dashboard 
-        onLogout={() => setCurrentPage('home')} 
+        onLogout={handleLogout} 
         onRepoSelect={handleRepoSelect}
       />
     );
@@ -46,7 +69,7 @@ function App() {
     return (
         <Login 
             onBack={() => setCurrentPage('home')} 
-            onLogin={() => setCurrentPage('dashboard')} 
+            onLogin={handleLogin} 
         />
     );
   }
