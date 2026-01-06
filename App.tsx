@@ -11,7 +11,7 @@ import { Footer } from './components/Footer';
 import { Login } from './components/Login';
 import { Dashboard } from './components/Dashboard';
 import { RepositoryDetail } from './components/RepositoryDetail';
-import { api } from './lib/api';
+import { api, User } from './lib/api';
 
 type Page = 'home' | 'login' | 'dashboard' | 'repo-detail';
 
@@ -35,21 +35,8 @@ function App() {
 
   const navigateToLogin = () => setCurrentPage('login');
   
-  const handleLogin = (userData: { name: string; email: string; handle: string }) => {
-    // Generate initials for the UI
-    const initials = userData.name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .substring(0, 2);
-
-    api.setSession({ 
-      name: userData.name, 
-      email: userData.email,
-      handle: userData.handle,
-      initials: initials || '??'
-    });
+  const handleLogin = (userData: User) => {
+    api.setSession(userData);
     setCurrentPage('dashboard');
   };
 

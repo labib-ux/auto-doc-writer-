@@ -36,6 +36,8 @@ export interface User {
   email: string;
   handle: string;
   initials: string;
+  avatarUrl: string;
+  bio?: string;
 }
 
 export interface AvailableRepo {
@@ -45,11 +47,11 @@ export interface AvailableRepo {
   isPrivate: boolean;
   language: string;
   stars: number;
+  url: string;
 }
 
 const STORAGE_PREFIX = 'autodoc_v3_';
-
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+const GITHUB_API_URL = 'https://api.github.com';
 
 class ApiClient {
   private getStorageKey(key: string): string {
@@ -67,31 +69,51 @@ class ApiClient {
     localStorage.setItem(this.getStorageKey(key), JSON.stringify(data));
   }
 
+  // GITHUB LIVE INTEGRATION
+  async fetchGitHubUser(handle: string): Promise<User> {
+    const response = await fetch(`${GITHUB_API_URL}/users/${handle}`);
+    if (!response.ok) {
+      if (response.status === 404) throw new Error("GitHub user not found.");
+      throw new Error("GitHub API rate limit exceeded or connection error.");
+    }
+    const data = await response.json();
+    return {
+      name: data.name || data.login,
+      email: data.email || `${data.login}@github.com`,
+      handle: data.login,
+      avatarUrl: data.avatar_url,
+      bio: data.bio,
+      initials: (data.name || data.login).substring(0, 2).toUpperCase()
+    };
+  }
+
+  async getAvailableGithubRepos(handle: string): Promise<AvailableRepo[]> {
+    const importedRepos = this.getFromStorage<Repo[]>('repos').map(r => r.name);
+    const response = await fetch(`${GITHUB_API_URL}/users/${handle}/repos?sort=updated&per_page=50`);
+    
+    if (!response.ok) return [];
+    
+    const data = await response.json();
+    return data
+      .filter((r: any) => !importedRepos.includes(r.name))
+      .map((r: any) => ({
+        id: r.id,
+        name: r.name,
+        desc: r.description || 'No description provided.',
+        isPrivate: r.private,
+        language: r.language || 'Plain Text',
+        stars: r.stargazers_count,
+        url: r.html_url
+      }));
+  }
+
   // REPOSITORIES
   async getRepos(): Promise<Repo[]> {
-    await delay(300);
     const repos = this.getFromStorage<Repo[]>('repos');
-    // If empty, provide a single onboarding repo for new users
-    if (repos.length === 0) {
-      const user = this.getCurrentUser();
-      const initial = [{ 
-        id: Date.now(), 
-        name: `${user?.handle || 'new-user'}-docs-example`, 
-        desc: 'Sample repository to explore documentation generation.', 
-        isPrivate: true, 
-        isActive: true, 
-        lastUpdate: 'Just now', 
-        branch: 'main', 
-        docCount: 0 
-      }];
-      this.saveToStorage('repos', initial);
-      return initial;
-    }
     return repos;
   }
 
   async addRepo(repo: Partial<Repo>): Promise<Repo> {
-    await delay(800);
     const repos = this.getFromStorage<Repo[]>('repos');
     const newRepo: Repo = {
       id: Date.now(),
@@ -108,7 +130,7 @@ class ApiClient {
     this.logActivity({
       type: 'create',
       repo: newRepo.name,
-      message: 'Repository imported from GitHub'
+      message: 'Repository successfully linked from GitHub'
     });
     return newRepo;
   }
@@ -122,31 +144,8 @@ class ApiClient {
     return repos[idx];
   }
 
-  // GITHUB SIMULATION
-  async getAvailableGithubRepos(handle: string): Promise<AvailableRepo[]> {
-    await delay(1000);
-    const importedRepos = this.getFromStorage<Repo[]>('repos').map(r => r.name);
-    
-    // Generate deterministic repos based on handle
-    const seeds = ['api', 'ui', 'core', 'utils', 'engine', 'plugin', 'app', 'tool'];
-    const langs = ['TypeScript', 'Python', 'Go', 'Rust', 'JavaScript'];
-    
-    const generated: AvailableRepo[] = seeds.map((seed, i) => ({
-      id: i + 100,
-      name: `${handle.toLowerCase()}-${seed}`,
-      desc: `A powerful ${seed} component for building modern software architectures.`,
-      isPrivate: i % 2 === 0,
-      language: langs[i % langs.length],
-      stars: Math.floor(Math.random() * 500)
-    }));
-
-    // Filter out ones already imported
-    return generated.filter(g => !importedRepos.includes(g.name));
-  }
-
   // DOCUMENTS
   async getDocs(): Promise<Document[]> {
-    await delay(300);
     return this.getFromStorage<Document[]>('docs');
   }
 
@@ -188,7 +187,7 @@ class ApiClient {
   }
 
   private logActivity(item: Partial<ActivityItem>) {
-    const activity = this.getFromStorage<ActivityItem[]>('activity');
+    const activity = this.getFromStorage<ActivityItem[]|undefined>('activity') || [];
     const currentUser = this.getCurrentUser();
     const newItem: ActivityItem = {
       id: Date.now(),
