@@ -35,8 +35,21 @@ function App() {
 
   const navigateToLogin = () => setCurrentPage('login');
   
-  const handleLogin = () => {
-    api.setSession({ name: 'John Doe', email: 'john@example.com' });
+  const handleLogin = (userData: { name: string; email: string; handle: string }) => {
+    // Generate initials for the UI
+    const initials = userData.name
+      .split(' ')
+      .map(n => n[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
+
+    api.setSession({ 
+      name: userData.name, 
+      email: userData.email,
+      handle: userData.handle,
+      initials: initials || '??'
+    });
     setCurrentPage('dashboard');
   };
 

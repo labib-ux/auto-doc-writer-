@@ -8,7 +8,7 @@ export interface Repo {
   lastUpdate: string;
   branch: string;
   docCount: number;
-  files?: any[]; // Simulating file structure
+  files?: any[];
 }
 
 export interface ActivityItem {
@@ -31,51 +31,68 @@ export interface Document {
   content: string;
 }
 
-const STORAGE_KEYS = {
-  REPOS: 'autodoc_repos',
-  ACTIVITY: 'autodoc_activity',
-  DOCS: 'autodoc_docs',
-  USER: 'autodoc_user'
-};
+export interface User {
+  name: string;
+  email: string;
+  handle: string;
+  initials: string;
+}
+
+export interface AvailableRepo {
+  id: number;
+  name: string;
+  desc: string;
+  isPrivate: boolean;
+  language: string;
+  stars: number;
+}
+
+const STORAGE_PREFIX = 'autodoc_v3_';
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 class ApiClient {
-  // Initialization with default data if empty
-  constructor() {
-    if (!localStorage.getItem(STORAGE_KEYS.REPOS)) {
-      const initialRepos: Repo[] = [
-        { id: 1, name: 'autodoc-writer-core', desc: 'Core logic for documentation generation engine.', isPrivate: true, isActive: true, lastUpdate: '2m ago', branch: 'main', docCount: 1 },
-        { id: 2, name: 'react-three-fiber-experiments', desc: 'Visual experiments and 3D scenes.', isPrivate: false, isActive: false, lastUpdate: '1d ago', branch: 'dev', docCount: 0 },
-      ];
-      localStorage.setItem(STORAGE_KEYS.REPOS, JSON.stringify(initialRepos));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.ACTIVITY)) {
-      localStorage.setItem(STORAGE_KEYS.ACTIVITY, JSON.stringify([]));
-    }
-    if (!localStorage.getItem(STORAGE_KEYS.DOCS)) {
-      localStorage.setItem(STORAGE_KEYS.DOCS, JSON.stringify([]));
-    }
+  private getStorageKey(key: string): string {
+    const user = this.getCurrentUser();
+    const userSuffix = user ? `_${user.handle.toLowerCase()}` : '_guest';
+    return `${STORAGE_PREFIX}${key}${userSuffix}`;
   }
 
   private getFromStorage<T>(key: string): T {
-    const data = localStorage.getItem(key);
-    return data ? JSON.parse(data) : [];
+    const data = localStorage.getItem(this.getStorageKey(key));
+    return data ? JSON.parse(data) : [] as unknown as T;
   }
 
   private saveToStorage(key: string, data: any) {
-    localStorage.setItem(key, JSON.stringify(data));
+    localStorage.setItem(this.getStorageKey(key), JSON.stringify(data));
   }
 
   // REPOSITORIES
   async getRepos(): Promise<Repo[]> {
-    await delay(500);
-    return this.getFromStorage<Repo[]>(STORAGE_KEYS.REPOS);
+    await delay(300);
+    const repos = this.getFromStorage<Repo[]>('repos');
+    // If empty, provide a single onboarding repo for new users
+    if (repos.length === 0) {
+      const user = this.getCurrentUser();
+      const initial = [{ 
+        id: Date.now(), 
+        name: `${user?.handle || 'new-user'}-docs-example`, 
+        desc: 'Sample repository to explore documentation generation.', 
+        isPrivate: true, 
+        isActive: true, 
+        lastUpdate: 'Just now', 
+        branch: 'main', 
+        docCount: 0 
+      }];
+      this.saveToStorage('repos', initial);
+      return initial;
+    }
+    return repos;
   }
 
   async addRepo(repo: Partial<Repo>): Promise<Repo> {
-    await delay(1000);
-    const repos = this.getFromStorage<Repo[]>(STORAGE_KEYS.REPOS);
+    await delay(800);
+    const repos = this.getFromStorage<Repo[]>('repos');
     const newRepo: Repo = {
       id: Date.now(),
       name: repo.name || 'Untitled',
@@ -87,32 +104,54 @@ class ApiClient {
       docCount: 0,
       ...repo
     };
-    this.saveToStorage(STORAGE_KEYS.REPOS, [newRepo, ...repos]);
+    this.saveToStorage('repos', [newRepo, ...repos]);
     this.logActivity({
       type: 'create',
       repo: newRepo.name,
-      message: 'Repository imported successfully'
+      message: 'Repository imported from GitHub'
     });
     return newRepo;
   }
 
   async updateRepo(id: number, updates: Partial<Repo>): Promise<Repo> {
-    const repos = this.getFromStorage<Repo[]>(STORAGE_KEYS.REPOS);
+    const repos = this.getFromStorage<Repo[]>('repos');
     const idx = repos.findIndex(r => r.id === id);
     if (idx === -1) throw new Error("Repo not found");
     repos[idx] = { ...repos[idx], ...updates };
-    this.saveToStorage(STORAGE_KEYS.REPOS, repos);
+    this.saveToStorage('repos', repos);
     return repos[idx];
+  }
+
+  // GITHUB SIMULATION
+  async getAvailableGithubRepos(handle: string): Promise<AvailableRepo[]> {
+    await delay(1000);
+    const importedRepos = this.getFromStorage<Repo[]>('repos').map(r => r.name);
+    
+    // Generate deterministic repos based on handle
+    const seeds = ['api', 'ui', 'core', 'utils', 'engine', 'plugin', 'app', 'tool'];
+    const langs = ['TypeScript', 'Python', 'Go', 'Rust', 'JavaScript'];
+    
+    const generated: AvailableRepo[] = seeds.map((seed, i) => ({
+      id: i + 100,
+      name: `${handle.toLowerCase()}-${seed}`,
+      desc: `A powerful ${seed} component for building modern software architectures.`,
+      isPrivate: i % 2 === 0,
+      language: langs[i % langs.length],
+      stars: Math.floor(Math.random() * 500)
+    }));
+
+    // Filter out ones already imported
+    return generated.filter(g => !importedRepos.includes(g.name));
   }
 
   // DOCUMENTS
   async getDocs(): Promise<Document[]> {
-    await delay(400);
-    return this.getFromStorage<Document[]>(STORAGE_KEYS.DOCS);
+    await delay(300);
+    return this.getFromStorage<Document[]>('docs');
   }
 
   async addDoc(doc: Partial<Document>): Promise<Document> {
-    const docs = this.getFromStorage<Document[]>(STORAGE_KEYS.DOCS);
+    const docs = this.getFromStorage<Document[]>('docs');
     const newDoc: Document = {
       id: Date.now(),
       name: doc.name || 'Untitled Doc',
@@ -124,15 +163,14 @@ class ApiClient {
       content: doc.content || '',
       ...doc
     };
-    this.saveToStorage(STORAGE_KEYS.DOCS, [newDoc, ...docs]);
+    this.saveToStorage('docs', [newDoc, ...docs]);
     
-    // Update repo doc count
-    const repos = this.getFromStorage<Repo[]>(STORAGE_KEYS.REPOS);
+    const repos = this.getFromStorage<Repo[]>('repos');
     const repoIdx = repos.findIndex(r => r.name === newDoc.repo);
     if (repoIdx !== -1) {
       repos[repoIdx].docCount += 1;
       repos[repoIdx].lastUpdate = 'Just now';
-      this.saveToStorage(STORAGE_KEYS.REPOS, repos);
+      this.saveToStorage('repos', repos);
     }
 
     this.logActivity({
@@ -146,32 +184,40 @@ class ApiClient {
 
   // ACTIVITY
   async getActivity(): Promise<ActivityItem[]> {
-    return this.getFromStorage<ActivityItem[]>(STORAGE_KEYS.ACTIVITY);
+    return this.getFromStorage<ActivityItem[]>('activity');
   }
 
   private logActivity(item: Partial<ActivityItem>) {
-    const activity = this.getFromStorage<ActivityItem[]>(STORAGE_KEYS.ACTIVITY);
+    const activity = this.getFromStorage<ActivityItem[]>('activity');
+    const currentUser = this.getCurrentUser();
     const newItem: ActivityItem = {
       id: Date.now(),
       time: 'Just now',
       repo: item.repo || '-',
       type: item.type || 'system',
       message: item.message || '',
-      user: 'johndoe',
+      user: currentUser?.handle.toLowerCase() || 'system',
       ...item
     };
-    this.saveToStorage(STORAGE_KEYS.ACTIVITY, [newItem, ...activity].slice(0, 50));
+    this.saveToStorage('activity', [newItem, ...activity].slice(0, 50));
   }
 
-  // AUTH SIMULATION
-  setSession(user: any) {
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(user));
+  // AUTH
+  setSession(user: User) {
+    localStorage.setItem(`${STORAGE_PREFIX}session`, JSON.stringify(user));
   }
+  
   getSession() {
-    return localStorage.getItem(STORAGE_KEYS.USER);
+    return localStorage.getItem(`${STORAGE_PREFIX}session`);
   }
+
+  getCurrentUser(): User | null {
+    const data = localStorage.getItem(`${STORAGE_PREFIX}session`);
+    return data ? JSON.parse(data) : null;
+  }
+
   clearSession() {
-    localStorage.removeItem(STORAGE_KEYS.USER);
+    localStorage.removeItem(`${STORAGE_PREFIX}session`);
   }
 }
 
