@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, FileText, FileCode, Check, Play, BookOpen } from 'lucide-react';
+import { X, FileText, FileCode, Check, Play, BookOpen, Eye, Download, Copy } from 'lucide-react';
 import { generateDocumentation } from '../lib/gemini';
 import { api, Repo } from '../lib/api';
 
@@ -17,6 +17,8 @@ export const GenerateDocsModal: React.FC<GenerateDocsModalProps> = ({ repo, isOp
   const [progress, setProgress] = useState(0);
   const [logs, setLogs] = useState<string[]>([]);
   const [results, setResults] = useState<Record<string, string>>({});
+  const [previewData, setPreviewData] = useState<{ fmt: string; text: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (isOpen && repo) {
@@ -25,6 +27,7 @@ export const GenerateDocsModal: React.FC<GenerateDocsModalProps> = ({ repo, isOp
         setProgress(0);
         setLogs([]);
         setResults({});
+        setPreviewData(null);
     }
   }, [isOpen, repo]);
 
@@ -80,6 +83,23 @@ export const GenerateDocsModal: React.FC<GenerateDocsModalProps> = ({ repo, isOp
     }
   };
 
+  const handleDownload = (fmt: string, text: string) => {
+    const element = document.createElement("a");
+    const file = new Blob([text], {type: 'text/plain'});
+    element.href = URL.createObjectURL(file);
+    const ext = fmt === 'markdown' ? 'md' : fmt === 'latex' ? 'tex' : 'txt';
+    element.download = `${repo?.name || 'docs'}-${fmt}.${ext}`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const formats = [
     { id: 'markdown', label: 'Markdown', icon: <FileCode size={20} />, desc: 'Standard .md files.' },
     { id: 'pdf', label: 'PDF Report', icon: <FileText size={20} />, desc: 'Formal report layout.' },
@@ -91,11 +111,17 @@ export const GenerateDocsModal: React.FC<GenerateDocsModalProps> = ({ repo, isOp
       {isOpen && repo && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+          
           <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="relative w-full max-w-2xl bg-zinc-950 border border-zinc-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Main Header */}
             <div className="p-8 border-b border-zinc-900 flex items-center justify-between bg-zinc-900/20">
-              <div><h2 className="text-2xl font-black text-white">Generate Documentation</h2><p className="text-sm text-zinc-500 font-bold mt-1 uppercase tracking-widest">Target: {repo.name}</p></div>
+              <div>
+                <h2 className="text-2xl font-black text-white">Generate Documentation</h2>
+                <p className="text-sm text-zinc-500 font-bold mt-1 uppercase tracking-widest">Target: {repo.name}</p>
+              </div>
               <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-full transition-colors"><X size={24} /></button>
             </div>
+
             <div className="p-8 flex-1 overflow-y-auto">
                 {step === 'config' && (
                     <div className="space-y-8">
@@ -136,9 +162,26 @@ export const GenerateDocsModal: React.FC<GenerateDocsModalProps> = ({ repo, isOp
                             <div><h3 className="text-xl font-black text-white">Analysis Finished</h3><p className="text-zinc-400 font-medium">Docs saved to your workspace.</p></div>
                         </div>
                         <div className="space-y-4">
-                            {Object.entries(results).map(([fmt, text]) => (
-                                <div key={fmt} className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl">
-                                    <div className="flex items-center justify-between mb-2"><span className="font-black uppercase text-xs tracking-widest text-brand">{fmt} Output</span></div>
+                            {/* Fix: Explicitly type the result entries to avoid 'unknown' inference errors */}
+                            {(Object.entries(results) as [string, string][]).map(([fmt, text]) => (
+                                <div key={fmt} className="bg-zinc-900 border border-zinc-800 p-6 rounded-2xl relative">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <span className="font-black uppercase text-xs tracking-widest text-brand">{fmt} Output</span>
+                                        <div className="flex items-center gap-2">
+                                            <button 
+                                                onClick={() => setPreviewData({ fmt, text })}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-bold transition-colors"
+                                            >
+                                                <Eye size={14} /> Preview
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDownload(fmt, text)}
+                                                className="flex items-center gap-1.5 px-3 py-1.5 bg-brand/20 hover:bg-brand/40 text-brand rounded-lg text-xs font-bold transition-colors"
+                                            >
+                                                <Download size={14} /> Download
+                                            </button>
+                                        </div>
+                                    </div>
                                     <pre className="text-[10px] text-zinc-500 line-clamp-3 bg-black/40 p-4 rounded-xl font-mono">{text}</pre>
                                 </div>
                             ))}
@@ -146,6 +189,53 @@ export const GenerateDocsModal: React.FC<GenerateDocsModalProps> = ({ repo, isOp
                     </div>
                 )}
             </div>
+
+            {/* Preview Overlay */}
+            <AnimatePresence>
+                {previewData && (
+                    <motion.div 
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 20 }}
+                        className="absolute inset-0 z-50 bg-zinc-950 flex flex-col"
+                    >
+                        <div className="p-6 border-b border-zinc-900 flex items-center justify-between bg-zinc-900/40">
+                            <div className="flex items-center gap-4">
+                                <span className="px-3 py-1 bg-brand text-white text-[10px] font-black rounded-lg uppercase">{previewData.fmt}</span>
+                                <h3 className="font-bold text-white">Content Preview</h3>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button 
+                                    onClick={() => handleCopy(previewData.text)}
+                                    className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white transition-colors"
+                                    title="Copy to clipboard"
+                                >
+                                    {copied ? <Check size={18} className="text-green-500" /> : <Copy size={18} />}
+                                </button>
+                                <button 
+                                    onClick={() => handleDownload(previewData.fmt, previewData.text)}
+                                    className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white transition-colors"
+                                    title="Download file"
+                                >
+                                    <Download size={18} />
+                                </button>
+                                <button 
+                                    onClick={() => setPreviewData(null)} 
+                                    className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white ml-2"
+                                >
+                                    <X size={20} />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-10 bg-black/40">
+                            <pre className="font-mono text-sm text-zinc-300 whitespace-pre-wrap leading-relaxed">
+                                {previewData.text}
+                            </pre>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             <div className="p-8 border-t border-zinc-900 bg-zinc-900/20 flex justify-end gap-4">
                 {step === 'config' ? (
                     <>
